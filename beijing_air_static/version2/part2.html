@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<!-- author: Su-Young Hong
+version: 0.1
+date: April 2016
+title: Project 1 Part 2
+email: suyoung.hong@gmail.com -->
+<html>
+	<head>
+		<meta charset="utf-8">  <!-- not sure what this is for, but everyone 
+								seems to use it? -->
+  		<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.12/d3.min.js">
+  		</script> <!-- this loads D3 -->
+  		<style>
+      		body {
+        		font-family: Copperplate;
+        	}
+      		h2.title {
+        		color: black;
+        		text-align: center;
+      		}
+      		.axis {
+        		font-family: arial;
+        		font-size: 0.7em;
+      			
+      		}
+      		text {
+        		fill: black;
+        		stroke: none;
+      		}
+      		.label {
+        		font-size: 2em;
+      		}
+      		path{
+        		fill: none;
+        		stroke: black;
+        		stroke-width: 2px;
+      		}
+      		.tick {
+        		fill: none;
+        		stroke: black;
+      		}
+      		.bar {
+        	opacity: 1;
+        	stroke: none;
+      		}
+
+    	</style><!-- this is like random css attributes for random elements that will come up -->
+    	<script>
+    	function draw(data){
+
+    		//set your overall margins
+    		var margin = {top: 20, right: 20, bottom: 60, left: 75};
+    		var width = 900 - margin.left - margin.right;
+    		var height = 500 - margin.top - margin.bottom;
+
+    		var barpadding = 20;
+
+    		//we need 3 scales, a time scale for x, a measure scale for y, and a color scale for different percentiles
+    		//our y axis scale, scaled to the max of our Q90 quantile
+    		var y_max = d3.max(data, function(x){
+    			return +x.Q90
+    		})
+    		var y_scale = d3.scale.linear()
+    		.range([height, 0])
+    		.domain([0,y_max])
+
+
+    		//our x axis scale, scaled to dates
+    		var date_format = d3.time.format("%b");
+    		var dates_extent = d3.extent(data, function(x){
+    			return date_format.parse(x['month'])
+    		});
+    		var x_scale = d3.time.scale()
+    		.range([0,width])
+    		.domain(dates_extent)
+
+
+    		//our ordinal color scale, corresponding to different classes, i.e. quantiles we'll represent
+    		var group_scale = d3.scale.ordinal()
+    		.range(["#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56"])
+    		.domain(["Q10", "Q25", "medians", "Q75", "Q90"]);
+    		//okay, I'm hardcoding my groups here because... it's too much of a pain otherwise
+
+
+    		//set up our svg, and group where we'll create our elements
+    		var firstG = d3.select('body').append('svg')
+    		.attr("width", width + margin.left + margin.right + (barpadding*data.length)/2)
+    		.attr("height", height + margin.top + margin.bottom)
+    		.append('g')
+    		.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+
+/*    		//method one, use a function to go through all our different classes of data and create
+    		//a bunch of <rect> objects in parallel (so not nested, all on the same level) for each
+    		//group
+    		function testing(item){
+	    		var group = d3.select('body').select('svg').select('g')
+
+	    		var bars = group.selectAll(item).data(data).enter().append('rect')
+
+	    		bars.attr('class','bar')
+	    		.attr('x',function(x){
+	    			return x_scale(date_format.parse(x.month))
+	    		})
+	    		.attr('width', (width/data.length)-barpadding)
+	    		.attr('height', function(x){
+	    			return (height - y_scale(x[item]))
+	    		})
+	    		.attr('y', function(x){
+	    			return y_scale(x[item])
+	    		})
+	    		.style('fill', group_scale(item));
+	    	};
+
+	    	group_scale.domain().slice().reverse().map(testing)
+*/
+/*
+			//method two, same as above, but hardcoding each step by hand instead of throwing
+			//everything into a function and mapping it with parameters
+    		var firstbars = firstG.selectAll('Q90').data(data).enter().append('rect')
+
+    		firstbars.attr('class','bar')
+    		.attr('x',function(x){
+    			return x_scale(date_format.parse(x.month))
+    		})
+    		.attr('width', (width/data.length)-barpadding)
+    		.attr('height', function(x){
+    			return (height - y_scale(x['Q90']))
+    		})
+    		.attr('y', function(x){
+    			return y_scale(x['Q90'])
+    		})
+    		.style('fill', group_scale('Q90'));
+
+    		var secondbars = firstG.selectAll('Q75').data(data).enter();
+
+			secondbars.append('rect')
+			.attr('class','bar')
+    		.attr('x',function(x){
+    			return x_scale(date_format.parse(x.month))
+    		})
+    		.attr('width', (width/data.length)-barpadding)
+    		.attr('height', function(x){
+    			return (height - y_scale(x['Q75']))
+    		})
+    		.attr('y', function(x){
+    			return y_scale(x['Q75'])
+    		})
+    		.style('fill', group_scale('Q75'));
+
+    		//etc.
+*/
+
+
+			//method 3: manipulate the data to have a nested structure, and the create groups and create
+			//all the rectangles at once, WITHIN a subgrouping for each bar!
+			var groups = d3.select('body').select('svg').select('g');
+
+			data.forEach(function(x){
+				x.inner_list = group_scale.domain().slice().reverse()
+								.map(function(pollution){
+										return [pollution, x[pollution]]
+									});
+			});
+
+			var months = groups.selectAll('.month').data(data).enter()
+			.append('g')
+			.attr('class','g')
+			.attr('transform',function(x){
+				return 'translate(' + x_scale(date_format.parse(x.month)) + ',0)';
+			});
+
+			var AAA = months.selectAll('.bar').data(function(x){
+				return x.inner_list
+			}).enter()
+			.append('rect')
+			.attr('class','bar')
+			.attr('x',0)
+			.attr('y',function(x){
+				return y_scale(x[1])
+			})
+			.attr('width',(width/data.length)-barpadding)
+    		.attr('height', function(x){
+    			return (height - y_scale(x[1]))
+    		})
+    		.attr('id',function(x){
+    			return x[0]
+    		})
+			.style('fill',function(x){
+				return group_scale(x[0])
+			});
+
+			//create axis objects and visual axis elements on page
+			var xAxis = d3.svg.axis()
+    		.scale(x_scale)
+    		.orient("bottom")
+    		.tickFormat(d3.time.format("%b"));
+
+    		var yAxis = d3.svg.axis()
+		    .scale(y_scale)
+		    .orient("left");
+
+	    	firstG.append("g")
+		    .attr("class", "x axis")
+		    .attr("transform", "translate(" + (((width/data.length)-barpadding)/2) + "," + height + ")")
+		    .call(xAxis)
+		    .append("text")
+		    .attr("class","label")
+		    .text("Month")
+		    .attr("y", 35)
+		    .attr('x', width/2)
+		    .style('font-size','1.2em')
+		    .style('text-anchor', 'middle');
+
+		    firstG.append("g")
+		    .attr("class", "y axis")
+		    .call(yAxis)
+		    .append("text")
+		    .attr('class','label')
+		    .text("PM 2.5 Air Quality Index")
+            .style('font-size', '1.2em')
+		    .attr("transform", "rotate(-90)")
+		    .attr("x", -(height / 2))
+		    .attr('y', -40)
+            .style("text-anchor", "middle");
+
+
+            //create legend for plot
+  			var legend = firstG.selectAll(".legend")
+      		.data(group_scale.domain().slice().reverse())
+    		.enter().append("g")
+    		.attr("class", "legend")
+    		.attr("transform", function(d, i) { return "translate(-480," + i * 20 + ")"; });
+
+    		legend.append("rect")
+		    .attr("x", width - 158)
+		    .attr("width", 18)
+		    .attr("height", 18)
+		    .style("fill", group_scale);
+
+		    legend.append("text")
+		    .attr("x", width - 174)
+		    .attr("y", 9)
+		    .attr("dy", ".35em")
+		    .style("text-anchor", "end")
+		    .text(function(d) { return d; });
+    		
+
+    		//create mouseover effect method one, remove other bars
+/*    		d3.selectAll('.legend').on('mouseover', 
+    			function(d){d3.selectAll('.bar').style('display','none');
+                           d3.selectAll('#' + d).style('display',null);
+                       }); 
+			d3.selectAll('.legend').on('mouseout', 
+				function(){d3.selectAll('.bar').style('display',null);
+						});*/
+
+			//create mouseover effect method two, highlight group selected
+/*			d3.selectAll('.legend').on('mouseover', function(d){d3.selectAll('#'+ d).style('stroke','yellow').style('stroke-width',2.5)});
+			d3.selectAll('.legend').on('mouseout', function(d){d3.selectAll('#'+ d).style('stroke',null).style('stroke-width',null)});
+*/
+
+			//create mouseover effect method three, like above, highlights the group, but without that wierd overlapping
+			firstG.append("text").attr('x',300).attr('y',50).attr('id','hovertext');
+			d3.selectAll('.legend').on('mouseover', function(d){d3.selectAll('#'+ d).style('outline','3px solid red');
+																d3.select('#hovertext').text('Worst pollution for ' + d + 'th quantile per month.');
+						});
+			d3.selectAll('.legend').on('mouseout', function(d){d3.selectAll('#'+ d).style('outline',null);
+																d3.select('#hovertext').text(null)
+																console.log(d3.mouse(this));
+															});
+    	}
+    	</script>
+	</head>
+	<body>
+		<h2 class='title'>Beijing Air Pollution: Monthly Quantiles</h2>  <!-- write the title of the plot -->
+		<script>
+			d3.csv('data.csv', draw) /*run function to populate plot*/
+		</script>
+	</body>
+</html>
